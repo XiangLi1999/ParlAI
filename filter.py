@@ -74,15 +74,17 @@ def process_data(path):
             temp  = line.strip().split('\t')
             if len(temp) == 2:
                 src_, tgt = temp
-                num = src_[0:1]
+                src_, tgt = src_.split(' '), tgt.split(' ')
+                num = int(src_[0:1])
                 src = src_[1:]
+                src, tgt = ' '.join(src), ' '.join(tgt)
             else:
                 continue
 
             if filter_instance(src, tgt): 
                 continue
             else:
-                src, tgt = src.split(' '), tgt.split(' ')
+                # src, tgt = src.split(' '), tgt.split(' ')
                 temp_lst.append((num, src, tgt))
     return temp_lst
 
