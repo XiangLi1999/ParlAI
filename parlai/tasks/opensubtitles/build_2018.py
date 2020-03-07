@@ -322,6 +322,7 @@ def create_fb_format(inpath, outpath, use_history):
 
 def build(datapath, use_history):
     dpath = os.path.join(datapath, 'OpenSubtitles2018')
+    '''
     if not use_history:
         dpath += '_no_history'
     version = '1'
@@ -344,4 +345,5 @@ def build(datapath, use_history):
 
         # Mark the data as built.
         build_data.mark_done(dpath, version_string=version)
+    '''
     return dpath
