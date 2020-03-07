@@ -1,13 +1,38 @@
 import sys
 import re
+from flashtext import KeywordProcessor
+
+bl_words = KeywordProcessor()
+en_words = KeywordProcessor()
+
+with open('offensive.txt', 'r') as of1:
+    for line in of1: 
+        bl_words.add_keyword(line.strip())
+
+with open('top50.txt', 'r') as tp50:
+    for line in tp50: 
+        en_words.add_keyword(line.strip())
+
+
 def filter_instance(src, tgt, info='info'):
     # Remove offensive words:
     # do not have the gold list of offensive words
-    # if args.bl_words and not args.leaves_only:
-    #   bad_words = bl_words.extract_keywords(tgt)
-    #   if bad_words:
-    #       print("skip\toffensive\t%s\t%s\tbad word(s): %s" % (info, tgt, bad_words), file=sys.stderr)
-    #       return True
+    if bl_words:
+      bad_words = bl_words.extract_keywords(tgt)
+      if bad_words:
+          print("skip\toffensive\t%s\t%s\tbad word(s): %s" % (info, tgt, bad_words), file=sys.stderr)
+          return True
+
+    # has to be question. 
+    if '?' not in src:
+        return True
+
+    # has to contain top words in English
+    if en_words:
+      en_word_exist = en_words.extract_keywords(tgt)
+      if not en_word_exist:
+          print("skip\toffensive\t%s\t%s\tbad word(s): %s" % (info, tgt, bad_words), file=sys.stderr)
+          return True
 
     # Remove empty targets:
     tgttoks = tgt.split()
@@ -91,7 +116,7 @@ def process_data(path):
 def print_data(out_path, temp_lst):
     with open(out_path, 'w') as f:
         for (nn, ll, rr) in temp_lst:
-            print(str(nn) + ' ' + ll + '\t' + tgt, file=f)
+            print(str(nn) + ' ' + ll + '\t' + rr, file=f)
 
     return 
 
