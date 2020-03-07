@@ -130,7 +130,4 @@ if __name__ == '__main__':
     print('start')
     path = sys.argv[1]
     lst = process_data(path)
-    for ll in lst:
-        print(ll)
-
     print_data(sys.argv[2], lst)
