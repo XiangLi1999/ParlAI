@@ -96,6 +96,21 @@ def filter_instance(src, tgt, info='info'):
     return False
 
 
+def flip(path, path2):
+    with open (path2, 'w') as f2:
+        with open (path, 'r') as f: 
+            for line in f:
+                temp  = line.strip().split('\t')
+                if len(temp) == 2:
+                    src_, tgt = temp
+                    src_, tgt = src_.split(' '), tgt.split(' ')
+                    num = int(src_[0])
+                    src = src_[1:]
+                    src, tgt = ' '.join(src), ' '.join(tgt)
+                    print(str(num) + ' ' + tgt + '\t' + src, file=f2)
+                else:
+                    continue
+
 def process_data(path): 
 
     temp_lst = []
@@ -129,5 +144,6 @@ def print_data(out_path, temp_lst):
 if __name__ == '__main__':
     print('start')
     path = sys.argv[1]
-    lst = process_data(path)
-    print_data(sys.argv[2], lst)
+    flip(path, sys.argv[2])
+    # lst = process_data(path)
+    # print_data(sys.argv[2], lst)
