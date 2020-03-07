@@ -7,6 +7,7 @@ en_words = KeywordProcessor()
 
 with open('offensive.txt', 'r') as of1:
     for line in of1: 
+        print(line.strip())
         bl_words.add_keyword(line.strip())
 
 with open('top50.txt', 'r') as tp50:
@@ -23,6 +24,8 @@ def filter_instance(src, tgt, info='info'):
     # Remove offensive words:
     # do not have the gold list of offensive words
     if bl_words:
+      print(tgt)
+      print()
       bad_words = bl_words.extract_keywords(tgt)
       if bad_words:
           print(bad_words)
