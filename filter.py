@@ -72,10 +72,10 @@ def process_data(path):
     with open (path, 'r') as f: 
         for line in f:
             temp  = line.strip().split('\t')
-                        if len(temp) == 2:
-                            src, tgt = temp
-                        else:
-                            continue
+                if len(temp) == 2:
+                    src, tgt = temp
+                else:
+                    continue
 
             if filter_instance(src, tgt): 
                 continue
