@@ -75,7 +75,7 @@ def process_data(path):
             if len(temp) == 2:
                 src_, tgt = temp
                 src_, tgt = src_.split(' '), tgt.split(' ')
-                num = int(src_[0:1])
+                num = int(src_[0])
                 src = src_[1:]
                 src, tgt = ' '.join(src), ' '.join(tgt)
             else:
@@ -90,8 +90,8 @@ def process_data(path):
 
 def print_data(out_path, temp_lst):
     with open(out_path, 'w') as f:
-        for ll in temp_lst:
-            print(' '.join(ll), file=f)
+        for (nn, ll, rr) in temp_lst:
+            print(str(nn) + ' ' + ll + '\t' + tgt, file=f)
 
     return 
 
@@ -102,3 +102,5 @@ if __name__ == '__main__':
     lst = process_data(path)
     for ll in lst:
         print(ll)
+
+    print_data(sys.argv[2], lst)
