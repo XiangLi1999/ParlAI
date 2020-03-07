@@ -14,12 +14,18 @@ with open('top50.txt', 'r') as tp50:
         en_words.add_keyword(line.strip())
 
 
+# print(bl_words)
+
+# bad_words = bl_words.extract_keywords('shut up asshole ?')
+# print(bad_words)
+
 def filter_instance(src, tgt, info='info'):
     # Remove offensive words:
     # do not have the gold list of offensive words
     if bl_words:
       bad_words = bl_words.extract_keywords(tgt)
       if bad_words:
+          print(bad_words)
           print("skip\toffensive\t%s\t%s\tbad word(s): %s" % (info, tgt, bad_words), file=sys.stderr)
           return True
 
@@ -31,7 +37,7 @@ def filter_instance(src, tgt, info='info'):
     if en_words:
       en_word_exist = en_words.extract_keywords(tgt)
       if not en_word_exist:
-          print("skip\toffensive\t%s\t%s\tbad word(s): %s" % (info, tgt, bad_words), file=sys.stderr)
+          print("skip\tuncommon\t%s\t%s\tbad word(s): %s" % (info, tgt, bad_words), file=sys.stderr)
           return True
 
     # Remove empty targets:
