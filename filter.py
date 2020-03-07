@@ -1,3 +1,5 @@
+import sys
+import re
 def filter_instance(src, tgt, info='info'):
 	# Remove offensive words:
 	# do not have the gold list of offensive words
@@ -68,14 +70,18 @@ def process_data(path):
 
 	temp_lst = []
 	with open (path, 'r') as f: 
-		for line in f: 
-			src, tgt = line.strip().split('\t')
-			src, tgt = src.split(' '), tgt.split(' ')
+		for line in f:
+			temp  = line.strip().split('\t')
+                        if len(temp) == 2:
+                            src, tgt = temp
+                        else:
+                            continue
 
 			if filter_instance(src, tgt): 
 				continue
 			else:
-				temp_lst.append((src, tgt))
+			    src, tgt = src.split(' '), tgt.split(' ')
+			    temp_lst.append((src, tgt))
 	return temp_lst
 
 def print_data(out_path, temp_lst):
@@ -85,3 +91,10 @@ def print_data(out_path, temp_lst):
 
 	return 
 
+
+if __name__ == '__main__':
+    print('start')
+    path = sys.argv[1]
+    lst = process_data(path)
+    for ll in lst:
+        print(ll)
