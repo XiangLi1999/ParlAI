@@ -73,7 +73,9 @@ def process_data(path):
         for line in f:
             temp  = line.strip().split('\t')
             if len(temp) == 2:
-                src, tgt = temp
+                src_, tgt = temp
+                num = src_[0:1]
+                src = src_[1:]
             else:
                 continue
 
@@ -81,7 +83,7 @@ def process_data(path):
                 continue
             else:
                 src, tgt = src.split(' '), tgt.split(' ')
-                temp_lst.append((src, tgt))
+                temp_lst.append((num, src, tgt))
     return temp_lst
 
 def print_data(out_path, temp_lst):
