@@ -331,6 +331,39 @@ class TransformerGeneratorAgent(TorchGeneratorAgent):
         return model
 
 
+class TransformerGeneratorMMIAgent(TorchGeneratorAgent):
+    """
+    Modified by Alexandra DeLucia and Aaron Mueller.
+    """
+    def __init__(self, opt, shared=None):
+        super().__init__(opt, shared)
+        self.model_backwards = []
+
+    @classmethod
+    def add_cmdline_args(cls, argparser):
+        """
+        Add command-line arguments specifically for this agent.
+        """
+        agent = argparser.add_argument_group('Transformer Generate MMI Arguments')
+        agent.add_argument("--datapath-backward", help="Location of backwards model")
+        add_common_cmdline_args(agent)
+        cls.dictionary_class().add_cmdline_args(argparser)
+
+        super(TransformerGeneratorMMIAgent, cls).add_cmdline_args(argparser)
+        return agent
+
+    def build_model(self, states=None):
+        """
+        Build and return model.
+        """
+        model = TransformerGeneratorModel(self.opt, self.dict)
+        if self.opt['embedding_type'] != 'random':
+            self._copy_embeddings(
+                model.encoder.embeddings.weight, self.opt['embedding_type']
+            )
+        return model
+
+
 class TransformerClassifierAgent(TorchClassifierAgent):
     """
     Classifier based on Transformer.
