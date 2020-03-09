@@ -2,7 +2,7 @@
 
 python -u examples/train_model.py \
 	-t opensubtitles \
-	-mf parlai_internal/backward.ckpt \
+	-mf parlai_internal/forward.ckpt \
 	-bs 64 \
 	-m transformer/generator \
 	--ffn-size 512 \

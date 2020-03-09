@@ -11,6 +11,11 @@ from parlai.core.torch_classifier_agent import TorchClassifierAgent
 from parlai.core.torch_ranker_agent import TorchRankerAgent
 from parlai.core.torch_generator_agent import TorchGeneratorAgent
 
+# Special imports for TransformerGeneratorMMIAgent
+from copy import deepcopy
+import torch.nn.functional as F
+from parlai.core.agents import create_agent
+
 from .modules import (
     TransformerMemNetModel,
     TransformerGeneratorModel,
@@ -337,7 +342,7 @@ class TransformerGeneratorMMIAgent(TorchGeneratorAgent):
     """
     def __init__(self, opt, shared=None):
         super().__init__(opt, shared)
-        self.model_backwards = []
+        self.model_backwards = None
 
     @classmethod
     def add_cmdline_args(cls, argparser):
@@ -345,7 +350,7 @@ class TransformerGeneratorMMIAgent(TorchGeneratorAgent):
         Add command-line arguments specifically for this agent.
         """
         agent = argparser.add_argument_group('Transformer Generate MMI Arguments')
-        agent.add_argument("--datapath-backward", help="Location of backwards model")
+        agent.add_argument("--model-file-backward", help="Location of backwards model")
         add_common_cmdline_args(agent)
         cls.dictionary_class().add_cmdline_args(argparser)
 
@@ -354,14 +359,129 @@ class TransformerGeneratorMMIAgent(TorchGeneratorAgent):
 
     def build_model(self, states=None):
         """
+        TODO: modify to give access to forward and backward models
         Build and return model.
         """
+        # Load forward model
+        print("Loading forward model...")
         model = TransformerGeneratorModel(self.opt, self.dict)
+
+        # Load backwards model
+        # Mess with opt['override']?
+        print("Loading backwards model...")
+        backwards_opt = deepcopy(self.opt)
+        if self.opt.get('model_file_backward'):
+            backwards_opt['model_file'] = self.opt['model_file_backward']
+            backwards_opt['override']['model_file'] = self.opt['model_file_backward']
+            backwards_opt['override']['no_cuda'] = self.opt['no_cuda']
+        else:
+            raise ValueError('model_file_backward option must have a value.')
+        self.model_backwards = create_agent(backwards_opt, self.dict)
+
         if self.opt['embedding_type'] != 'random':
             self._copy_embeddings(
                 model.encoder.embeddings.weight, self.opt['embedding_type']
             )
         return model
+
+    def _generate(self, batch, beam_size, max_ts):
+        """
+        Overwritten from parent to implement decoding with MMI-bidi objective.
+
+        Generate an output with beam search.
+
+        Depending on the options, this may perform greedy/topk/nucleus generation.
+
+        :param Batch batch:
+            Batch structure with input and labels
+        :param int beam_size:
+            Size of each beam during the search
+        :param int max_ts:
+            the maximum length of the decoded sequence
+
+        :return:
+            tuple (beam_pred_scores, n_best_pred_scores, beams)
+
+            - beam_preds_scores: list of (prediction, score) pairs for each sample in
+              Batch
+            - n_best_preds_scores: list of n_best list of tuples (prediction, score)
+              for each sample from Batch
+            - beams :list of Beam instances defined in Beam class, can be used for any
+              following postprocessing, e.g. dot logging.
+        """
+        print("In TransformerGeneratorMMIAgent self._generate()")
+        print(f"\tInput to method:\n\t\tBatch:{batch}\n\t\tBeam size: {beam_size}\n\t\tMax ts:{max_ts}")
+        model = self.model
+        if isinstance(model, torch.nn.parallel.DistributedDataParallel):
+            model = self.model.module
+        encoder_states = model.encoder(*self._encoder_input(batch))
+        if batch.text_vec is not None:
+            dev = batch.text_vec.device
+        else:
+            dev = batch.label_vec.device
+
+        bsz = (
+            len(batch.text_lengths)
+            if batch.text_lengths is not None
+            else len(batch.image)
+        )
+        if batch.text_vec is not None:
+            batchsize = batch.text_vec.size(0)
+            beams = [
+                self._treesearch_factory(dev).set_context(
+                    self._get_context(batch, batch_idx)
+                )
+                for batch_idx in range(batchsize)
+            ]
+        else:
+            beams = [self._treesearch_factory(dev) for _ in range(bsz)]
+
+        # repeat encoder outputs and decoder inputs
+        decoder_input = (
+            torch.LongTensor([self.START_IDX]).expand(bsz * beam_size, 1).to(dev)
+        )
+
+        inds = torch.arange(bsz).to(dev).unsqueeze(1).repeat(1, beam_size).view(-1)
+        encoder_states = model.reorder_encoder_states(encoder_states, inds)
+        incr_state = None
+
+        for _ts in range(max_ts):
+            if all((b.is_done() for b in beams)):
+                # exit early if possible
+                break
+
+            score, incr_state = model.decoder(decoder_input, encoder_states, incr_state)
+            # only need the final hidden state to make the word prediction
+            score = score[:, -1:, :]
+            score = model.output(score)
+            # score contains softmax scores for bsz * beam_size samples
+            score = score.view(bsz, beam_size, -1)
+            score = F.log_softmax(score, dim=-1)
+            for i, b in enumerate(beams):
+                if not b.is_done():
+                    b.advance(score[i])
+            incr_state_inds = torch.cat(
+                [
+                    beam_size * i + b.get_backtrack_from_current_step()
+                    for i, b in enumerate(beams)
+                ]
+            )
+            incr_state = model.reorder_decoder_incremental_state(
+                incr_state, incr_state_inds
+            )
+            decoder_input = torch.index_select(decoder_input, 0, incr_state_inds)
+            selection = torch.cat(
+                [b.get_output_from_current_step() for b in beams]
+            ).unsqueeze(-1)
+            decoder_input = torch.cat([decoder_input, selection], dim=-1)
+
+        # get all finilized candidates for each sample (and validate them)
+        n_best_beam_preds_scores = [b.get_rescored_finished() for b in beams]
+
+        # get the top prediction for each beam (i.e. minibatch sample)
+        beam_preds_scores = [n_best_list[0] for n_best_list in n_best_beam_preds_scores]
+        print(f"\tOutput of method:\n\t\tBeam prediction scores: {beam_preds_scores}\n\t\tBeams: {beams}")
+        return beam_preds_scores, beams
 
 
 class TransformerClassifierAgent(TorchClassifierAgent):
