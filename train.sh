@@ -17,4 +17,5 @@ python -u examples/train_model.py \
 	--attention-dropout 0.1 \
 	-eps 10 \
 	-ttim 86400 \
-	-lfc True
+	-lfc True \
+	--truncate 1024
