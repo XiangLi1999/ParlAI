@@ -84,10 +84,10 @@ def main():
     )
 
     # ADD MODEL ARGS HERE, UNCOMMENT TO USE KVMEMNN MODEL AS AN EXAMPLE
-    # argparser.set_defaults(
-    #     model='projects.personachat.kvmemnn.kvmemnn:Kvmemnn',
-    #     model_file='models:convai2/kvmemnn/model',
-    # )
+    argparser.set_defaults(
+        model='projects.personachat.kvmemnn.kvmemnn:Kvmemnn',
+        model_file='models:convai2/kvmemnn/model',
+    )
 
     opt = argparser.parse_args()
 
