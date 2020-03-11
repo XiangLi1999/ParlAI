@@ -10,6 +10,7 @@ from parlai.utils.torch import padded_3d
 from parlai.core.torch_classifier_agent import TorchClassifierAgent
 from parlai.core.torch_ranker_agent import TorchRankerAgent
 from parlai.core.torch_generator_agent import TorchGeneratorAgent
+from parlai.utils.distributed import is_distributed, sync_parameters
 
 # Special imports for TransformerGeneratorMMIAgent
 from copy import deepcopy
@@ -345,6 +346,27 @@ class TransformerGeneratorMMIAgent(TorchGeneratorAgent):
         self.model_backwards = None
         self.max_output_length = None
 
+        self.model_backwards = self.build_model_backwards()
+        if self.model_backwards is None:
+            raise AttributeError(
+                'build_model() and build_criterion() need to return the model or criterion'
+            )
+        if self.use_cuda:
+            self.model_backwards.cuda()
+
+        sync_parameters(self.model_backwards)
+        print("Total backwards parameters: {}".format(self._total_parameters()))
+        print("Trainable backwards parameters:  {}".format(self._trainable_parameters()))
+
+        if self.fp16:
+            self.model_backwards = self.model_backwards.half()
+
+        if shared is None and is_distributed():
+            self.model_backwards = torch.nn.parallel.DistributedDataParallel(
+                self.model_backwards, device_ids=[self.opt['gpu']], broadcast_buffers=False
+            )
+
+
     @classmethod
     def add_cmdline_args(cls, argparser):
         """
@@ -358,15 +380,7 @@ class TransformerGeneratorMMIAgent(TorchGeneratorAgent):
         super(TransformerGeneratorMMIAgent, cls).add_cmdline_args(argparser)
         return agent
 
-    def build_model(self, states=None):
-        """
-        TODO: modify to give access to forward and backward models
-        Build and return model.
-        """
-        # Load forward model
-        print("Loading forward model...")
-        model = TransformerGeneratorModel(self.opt, self.dict)
-
+    def build_model_backwards(self, states=None):
         # Load backwards model
         # Mess with opt['override']?
         print("Loading backwards model...")
@@ -377,9 +391,18 @@ class TransformerGeneratorMMIAgent(TorchGeneratorAgent):
             backwards_opt['override']['no_cuda'] = self.opt['no_cuda']
         else:
             raise ValueError('model_file_backward option must have a value.')
-        self.model_backwards = create_agent_from_opt_file(backwards_opt)
-        self.model_backwards = create_agent(backwards_opt, self.dict)
+        model_backwards = TransformerGeneratorModel(backwards_opt, self.dict)
+        return model_backwards
 
+    def build_model(self, states=None):
+        """
+        TODO: modify to give access to forward and backward models
+        Build and return model.
+        """
+        # Load forward model
+        print("Loading forward model...")
+        model = TransformerGeneratorModel(self.opt, self.dict)
+        
         if self.opt['embedding_type'] != 'random':
             self._copy_embeddings(
                 model.encoder.embeddings.weight, self.opt['embedding_type']
@@ -399,20 +422,24 @@ class TransformerGeneratorMMIAgent(TorchGeneratorAgent):
         print(f"self.model_backwards: {self.model_backwards}")
         print(f"self._encoder_input(targets): {self._encoder_input(targets)}")
         print(f"Input: {inputs}")
+        model_backwards = self.model_backwards
+        if isinstance(model_backwards, torch.nn.parallel.DistributedDataParallel):
+            model_backwards = self.model_backwards.module
+        print(model_backwards)
 
         for i in range(batch_size):
             for j in range(beam_size):
-                encoder_states = self.model_backwards.encoder(inputs[batch_size][beam_size][0])
+                encoder_states = model_backwards.encoder(inputs[batch_size][beam_size][0])
                 print(f"encoder states: {encoder_states}")
-                out_encoder, hid_encoder = self.model_backwards.encoder.forward(inputs, lengths[:, 0], encoder_states)
+                out_encoder, hid_encoder = model_backwards.encoder.forward(inputs, lengths[:, 0], encoder_states)
 
                 # Set initial state of decoder to final state of encoder
                 hid_decoder = hid_encoder
                 decoder_input = (torch.LongTensor([self.START_IDX]).expand(batch_size * beam_size, 1).to(dev))
-                outputs_record, hid_decoder = self.model_backwards.decoder.forward(decoder_input.view(batch_size, -1), hid_decoder)
+                outputs_record, hid_decoder = model_backwards.decoder.forward(decoder_input.view(batch_size, -1), hid_decoder)
 
                 for i in range(self.max_output_length - 1):
-                    out_decoder, hid_decoder = self.model_backwards.decoder.forward(targets[:, i].view(batch_size, -1), hid_decoder)
+                    out_decoder, hid_decoder = model_backwards.decoder.forward(targets[:, i].view(batch_size, -1), hid_decoder)
                     outputs_record = torch.cat((outputs_record, out_decoder), 1)
 
         pp = []
@@ -448,9 +475,12 @@ class TransformerGeneratorMMIAgent(TorchGeneratorAgent):
         print("In TransformerGeneratorMMIAgent self._generate()")
         print(f"\tInput to method:\n\t\tBatch:{batch}\n\t\tBeam size: {beam_size}\n\t\tMax ts:{max_ts}")
         model = self.model
+        model_backwards = self.model_backwards
         self.max_output_length = max_ts
         if isinstance(model, torch.nn.parallel.DistributedDataParallel):
             model = self.model.module
+        if isinstance(model_backwards, torch.nn.parallel.DistributedDataParallel):
+            model_backwards = self.model_backwards.module
         encoder_states = model.encoder(*self._encoder_input(batch))  # Initialization?
         if batch.text_vec is not None:
             dev = batch.text_vec.device
