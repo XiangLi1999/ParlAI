@@ -1,18 +1,17 @@
 #!/bin/bash
 
-python -u examples/train_model.py \
+python -m parlai.scripts.multiprocessing_train \
 	-t dailydialog \
 	-mf parlai_internal/forward_finetune.ckpt \
 	-bs 16 \
 	-m transformer/generator \
-	--ffn-size 256 \
-	-esz 256 \
-	-stim 7200 \
+	-stim 21600 \
 	-sval True \
-	-opt adam \
-	-lr 1 \
+	-opt sgd \
+	-lr 0.1 \
+	--embedding-type fasttext_cc \
+	--beam-size 5 \
 	-df data/OpenSubtitles2018/opensubtitles.dict \
-	--n-heads 2 \
 	--dropout 0.1 \
 	--attention-dropout 0.1 \
 	-eps 10 \
