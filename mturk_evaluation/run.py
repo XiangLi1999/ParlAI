@@ -54,7 +54,8 @@ def main():
     task_opt = {}
     task_opt['datatype'] = 'test'
     task_opt['datapath'] = opt['datapath']
-    task_opt['task'] = '#DailyDialog'
+    # task_opt['task'] = '#DailyDialog'
+    task_opt['task'] = '#Persona-Chat'
 
     mturk_agent_id = 'Worker'
     mturk_manager = MTurkManager(opt=opt, mturk_agent_ids=[mturk_agent_id])

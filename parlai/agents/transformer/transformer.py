@@ -419,33 +419,59 @@ class TransformerGeneratorMMIAgent(TorchGeneratorAgent):
         batch_size = len(inputs)
         beam_size = len(inputs[0])
         # targets = batch.text_vec
-        print(f"self.model_backwards: {self.model_backwards}")
-        print(f"self._encoder_input(targets): {self._encoder_input(targets)}")
-        print(f"Input: {inputs}")
+        # print(f"self.model_backwards: {self.model_backwards}")
+        # print(f"self._encoder_input(targets): {self._encoder_input(targets)}")
+        # print(f"Input: {inputs}")
         model_backwards = self.model_backwards
         if isinstance(model_backwards, torch.nn.parallel.DistributedDataParallel):
             model_backwards = self.model_backwards.module
-        print(model_backwards)
+
+        full_lst = []
+        for i in range(batch_size):
+            beam_lst = []
+            for j in range(beam_size):
+                encoder_states = model_backwards.encoder(inputs[i][j][0].unsqueeze(0))
+
+                # teacher forcing
+                ys = self._encoder_input(targets)[0]
+
+                bsz = ys.size(0)
+                seqlen = ys.size(1)
+                inputs_ = ys.narrow(1, 0, seqlen - 1)
+                inputs_ = torch.cat([model_backwards.START.detach().expand(bsz, 1), \
+                        inputs_], 1)
+                latent, _ = model_backwards.decoder(inputs_, encoder_states)
+                logits = model_backwards.output(latent)
+                _, preds = logits.max(dim=2)
+
+                score_view = logits.view(-1, logits.size(-1))
+                loss = self.criterion(score_view, ys.view(-1))
+                loss = loss.view(logits.shape[:-1]).sum(dim=1)
+
+                beam_lst.append(loss)
+            full_lst.append(beam_lst)
+
+        return full_lst
+
+
+    def rerank(self, inputs, score_back, lambda_):
+        batch_size = len(inputs)
+        beam_size = len(inputs[0])
+        batch_lst = []
 
         for i in range(batch_size):
+            final_lst = []
             for j in range(beam_size):
-                encoder_states = model_backwards.encoder(inputs[batch_size][beam_size][0])
-                print(f"encoder states: {encoder_states}")
-                out_encoder, hid_encoder = model_backwards.encoder.forward(inputs, lengths[:, 0], encoder_states)
+                text, score_fore = inputs[i][j]
 
-                # Set initial state of decoder to final state of encoder
-                hid_decoder = hid_encoder
-                decoder_input = (torch.LongTensor([self.START_IDX]).expand(batch_size * beam_size, 1).to(dev))
-                outputs_record, hid_decoder = model_backwards.decoder.forward(decoder_input.view(batch_size, -1), hid_decoder)
+                temp_score = (lambda_ * (-score_fore) + (1-lambda_) * score_back[i][j]).item()
 
-                for i in range(self.max_output_length - 1):
-                    out_decoder, hid_decoder = model_backwards.decoder.forward(targets[:, i].view(batch_size, -1), hid_decoder)
-                    outputs_record = torch.cat((outputs_record, out_decoder), 1)
+                final_lst.append((text, temp_score))
+            final_lst.sort(key=lambda x: x[1])
+            batch_lst.append(final_lst)
 
-        pp = []
-        for b in range(batch_size):
-            pp.append(sum([outputs_record[b][i][int(targets[b][i])] for i in range(lengths[b][1])]))
-        return pp
+        return batch_lst
+
 
     def _generate(self, batch, beam_size, max_ts):
         """
@@ -544,14 +570,12 @@ class TransformerGeneratorMMIAgent(TorchGeneratorAgent):
 
         # get all finalized candidates for each sample (and validate them)
         n_best_beam_preds_scores = [b.get_rescored_finished() for b in beams]
-        print(f"n_best_beam_preds_scores: {n_best_beam_preds_scores}")
+        # print(f"n_best_beam_preds_scores: {n_best_beam_preds_scores}")
 
-        # get the top prediction for each beam (i.e. minibatch sample)
-        beam_preds_scores = [n_best_list[0] for n_best_list in n_best_beam_preds_scores]
-        print(f"\tOutput of method:\n\t\tBeam prediction scores: {beam_preds_scores}\n\t\tBeams: {beams}")
+        score_back = self._compute_posterior(n_best_beam_preds_scores, batch)
+        final_lst = self.rerank(n_best_beam_preds_scores, score_back, 0.7)
 
-        # Check what compute_posterior does
-        self._compute_posterior(n_best_beam_preds_scores, batch)
+        beam_preds_scores = [n_best_list[0] for n_best_list in final_lst]
         return beam_preds_scores, beams
 
 
