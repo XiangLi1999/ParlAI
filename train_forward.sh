@@ -1,5 +1,6 @@
 #!/bin/bash
 
+source activate parlai
 python -m parlai.scripts.multiprocessing_train \
 	-t opensubtitles \
 	-mf parlai_internal/forward.ckpt \
@@ -7,7 +8,7 @@ python -m parlai.scripts.multiprocessing_train \
 	-m transformer/generator \
 	-stim 7200 \
 	-sval True \
-	-opt adam \
+	-opt sgd \
 	-lr 1.0 \
 	--embedding-type fasttext_cc \
 	--beam-size 5 \
