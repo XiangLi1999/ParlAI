@@ -955,9 +955,12 @@ class MTurkManager:
             # No frontend dir exists
             pass
 
-    def setup_server(self, task_directory_path=None):
+    def setup_server(self, task_directory_path=None, heroku_app_name=None, existing_app=False):
         """
         Prepare the MTurk server for the new HIT we would like to submit.
+
+        If you have an existing Heroku app, pass the name of the app. Instead of creating a new Heroku app,
+        this will deploy the task to the app that already exists.
         """
         assert self.task_state >= self.STATE_CREATED
         fin_word = 'start'
@@ -1108,6 +1111,8 @@ class MTurkManager:
                 heroku_team,
                 self.opt['hobby'],
                 tmp_dir=self.opt['tmp_dir'],
+                existing_app=existing_app,
+                heroku_app_name=heroku_app_name
             )
         else:
             self.populate_task_files(task_directory_path)
@@ -1118,6 +1123,8 @@ class MTurkManager:
                 heroku_team,
                 self.opt['hobby'],
                 tmp_dir=self.opt['tmp_dir'],
+                existing_app=existing_app,
+                heroku_app_name=heroku_app_name
             )
 
         shared_utils.print_and_log(logging.INFO, self.server_url)

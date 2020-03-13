@@ -38,48 +38,56 @@ def setup_legacy_heroku_server(
     heroku_team=None,
     use_hobby=False,
     tmp_dir=parent_dir,
+    existing_app=False,
+    heroku_app_name=None
 ):
     print("Heroku: Collecting files...")
-    # Install Heroku CLI
-    os_name = None
-    bit_architecture = None
+    # Check if heroku is already installed
+    is_installed = True if subprocess.call(["which", "heroku"]) == 0 else False
 
-    # Get the platform we are working on
-    platform_info = platform.platform()
-    if 'Darwin' in platform_info:  # Mac OS X
-        os_name = 'darwin'
-    elif 'Linux' in platform_info:  # Linux
-        os_name = 'linux'
+    if is_installed:
+        heroku_executable_path = "heroku"
     else:
-        os_name = 'windows'
+        # Install Heroku CLI
+        os_name = None
+        bit_architecture = None
 
-    # Find our architecture
-    bit_architecture_info = platform.architecture()[0]
-    if '64bit' in bit_architecture_info:
-        bit_architecture = 'x64'
-    else:
-        bit_architecture = 'x86'
+        # Get the platform we are working on
+        platform_info = platform.platform()
+        if 'Darwin' in platform_info:  # Mac OS X
+            os_name = 'darwin'
+        elif 'Linux' in platform_info:  # Linux
+            os_name = 'linux'
+        else:
+            os_name = 'windows'
 
-    # Remove existing heroku client files
-    existing_heroku_directory_names = glob.glob(os.path.join(tmp_dir, 'heroku-cli-*'))
-    if len(existing_heroku_directory_names) == 0:
-        if os.path.exists(os.path.join(tmp_dir, 'heroku.tar.gz')):
-            os.remove(os.path.join(tmp_dir, 'heroku.tar.gz'))
+        # Find our architecture
+        bit_architecture_info = platform.architecture()[0]
+        if '64bit' in bit_architecture_info:
+            bit_architecture = 'x64'
+        else:
+            bit_architecture = 'x86'
 
-        # Get the heroku client and unzip
-        os.chdir(tmp_dir)
-        sh.wget(
-            shlex.split(
-                '{}-{}-{}.tar.gz -O heroku.tar.gz'.format(
-                    heroku_url, os_name, bit_architecture
+        # Remove existing heroku client files
+        existing_heroku_directory_names = glob.glob(os.path.join(tmp_dir, 'heroku-cli-*'))
+        if len(existing_heroku_directory_names) == 0:
+            if os.path.exists(os.path.join(tmp_dir, 'heroku.tar.gz')):
+                os.remove(os.path.join(tmp_dir, 'heroku.tar.gz'))
+
+            # Get the heroku client and unzip
+            os.chdir(tmp_dir)
+            sh.wget(
+                shlex.split(
+                    '{}-{}-{}.tar.gz -O heroku.tar.gz'.format(
+                        heroku_url, os_name, bit_architecture
+                    )
                 )
             )
-        )
-        sh.tar(shlex.split('-xvzf heroku.tar.gz'))
+            sh.tar(shlex.split('-xvzf heroku.tar.gz'))
 
-    heroku_directory_name = glob.glob(os.path.join(tmp_dir, 'heroku-cli-*'))[0]
-    heroku_directory_path = os.path.join(tmp_dir, heroku_directory_name)
-    heroku_executable_path = os.path.join(heroku_directory_path, 'bin', 'heroku')
+        heroku_directory_name = glob.glob(os.path.join(tmp_dir, 'heroku-cli-*'))[0]
+        heroku_directory_path = os.path.join(tmp_dir, heroku_directory_name)
+        heroku_executable_path = os.path.join(heroku_directory_path, 'bin', 'heroku')
 
     server_source_directory_path = os.path.join(
         parent_dir, legacy_server_source_directory_name
@@ -133,33 +141,40 @@ def setup_legacy_heroku_server(
                 'program again.'.format(heroku_executable_path)
             )
 
-    heroku_app_name = (
-        '{}-{}-{}'.format(
-            user_name,
-            task_name,
-            hashlib.md5(heroku_user_identifier.encode('utf-8')).hexdigest(),
-        )
-    )[:30]
-
-    while heroku_app_name[-1] == '-':
-        heroku_app_name = heroku_app_name[:-1]
-
     # Create or attach to the server
     try:
-        if heroku_team is not None:
+        if existing_app:  # Deploy to existing app
             subprocess.check_output(
                 shlex.split(
-                    '{} create {} --team {}'.format(
-                        heroku_executable_path, heroku_app_name, heroku_team
-                    )
+                    '{} git:remote -a {}'.format(heroku_executable_path, heroku_app_name)
                 )
             )
         else:
-            subprocess.check_output(
-                shlex.split(
-                    '{} create {}'.format(heroku_executable_path, heroku_app_name)
+            heroku_app_name = (
+                  '{}-{}-{}'.format(
+                      user_name,
+                      task_name,
+                      hashlib.md5(heroku_user_identifier.encode('utf-8')).hexdigest(),
+                  )
+              )[:30]
+
+            while heroku_app_name[-1] == '-':
+                heroku_app_name = heroku_app_name[:-1]
+
+            if heroku_team is not None:
+                subprocess.check_output(
+                    shlex.split(
+                        '{} create {} --team {}'.format(
+                            heroku_executable_path, heroku_app_name, heroku_team
+                        )
+                    )
                 )
-            )
+            else:
+                subprocess.check_output(
+                    shlex.split(
+                        '{} create {}'.format(heroku_executable_path, heroku_app_name)
+                    )
+                )
     except subprocess.CalledProcessError:  # User has too many apps
         sh.rm(shlex.split('-rf {}'.format(heroku_server_directory_path)))
         raise SystemExit(
@@ -221,49 +236,58 @@ def setup_heroku_server(
     heroku_team=None,
     use_hobby=False,
     tmp_dir=parent_dir,
+    existing_app=False,
+    heroku_app_name=None
 ):
 
     print("Heroku: Collecting files... for ", tmp_dir)
-    # Install Heroku CLI
-    os_name = None
-    bit_architecture = None
 
-    # Get the platform we are working on
-    platform_info = platform.platform()
-    if 'Darwin' in platform_info:  # Mac OS X
-        os_name = 'darwin'
-    elif 'Linux' in platform_info:  # Linux
-        os_name = 'linux'
+    # Check if heroku is already installed
+    is_installed = True if subprocess.call(["which", "heroku"]) == 0 else False
+
+    if is_installed:
+        heroku_executable_path = "heroku"
     else:
-        os_name = 'windows'
+        # Install Heroku CLI
+        os_name = None
+        bit_architecture = None
 
-    # Find our architecture
-    bit_architecture_info = platform.architecture()[0]
-    if '64bit' in bit_architecture_info:
-        bit_architecture = 'x64'
-    else:
-        bit_architecture = 'x86'
+        # Get the platform we are working on
+        platform_info = platform.platform()
+        if 'Darwin' in platform_info:  # Mac OS X
+            os_name = 'darwin'
+        elif 'Linux' in platform_info:  # Linux
+            os_name = 'linux'
+        else:
+            os_name = 'windows'
 
-    # Remove existing heroku client files
-    existing_heroku_directory_names = glob.glob(os.path.join(tmp_dir, 'heroku-cli-*'))
-    if len(existing_heroku_directory_names) == 0:
-        if os.path.exists(os.path.join(tmp_dir, 'heroku.tar.gz')):
-            os.remove(os.path.join(tmp_dir, 'heroku.tar.gz'))
+        # Find our architecture
+        bit_architecture_info = platform.architecture()[0]
+        if '64bit' in bit_architecture_info:
+            bit_architecture = 'x64'
+        else:
+            bit_architecture = 'x86'
 
-        # Get the heroku client and unzip
-        os.chdir(tmp_dir)
-        sh.wget(
-            shlex.split(
-                '{}-{}-{}.tar.gz -O heroku.tar.gz'.format(
-                    heroku_url, os_name, bit_architecture
+        # Remove existing heroku client files
+        existing_heroku_directory_names = glob.glob(os.path.join(tmp_dir, 'heroku-cli-*'))
+        if len(existing_heroku_directory_names) == 0:
+            if os.path.exists(os.path.join(tmp_dir, 'heroku.tar.gz')):
+                os.remove(os.path.join(tmp_dir, 'heroku.tar.gz'))
+
+            # Get the heroku client and unzip
+            os.chdir(tmp_dir)
+            sh.wget(
+                shlex.split(
+                    '{}-{}-{}.tar.gz -O heroku.tar.gz'.format(
+                        heroku_url, os_name, bit_architecture
+                    )
                 )
             )
-        )
-        sh.tar(shlex.split('-xvzf heroku.tar.gz'))
+            sh.tar(shlex.split('-xvzf heroku.tar.gz'))
 
-    heroku_directory_name = glob.glob(os.path.join(tmp_dir, 'heroku-cli-*'))[0]
-    heroku_directory_path = os.path.join(tmp_dir, heroku_directory_name)
-    heroku_executable_path = os.path.join(heroku_directory_path, 'bin', 'heroku')
+        heroku_directory_name = glob.glob(os.path.join(tmp_dir, 'heroku-cli-*'))[0]
+        heroku_directory_path = os.path.join(tmp_dir, heroku_directory_name)
+        heroku_executable_path = os.path.join(heroku_directory_path, 'bin', 'heroku')
 
     server_source_directory_path = os.path.join(
         parent_dir, server_source_directory_name
@@ -394,33 +418,40 @@ def setup_heroku_server(
                 'program again.'.format(heroku_executable_path)
             )
 
-    heroku_app_name = (
-        '{}-{}-{}'.format(
-            user_name,
-            task_name,
-            hashlib.md5(heroku_user_identifier.encode('utf-8')).hexdigest(),
-        )
-    )[:30]
-
-    while heroku_app_name[-1] == '-':
-        heroku_app_name = heroku_app_name[:-1]
-
     # Create or attach to the server
     try:
-        if heroku_team is not None:
+        if existing_app:  # Deploy to existing app
             subprocess.check_output(
-                shlex.split(
-                    '{} create {} --team {}'.format(
-                        heroku_executable_path, heroku_app_name, heroku_team
+                    shlex.split(
+                        '{} git:remote -a {}'.format(heroku_executable_path, heroku_app_name)
                     )
                 )
-            )
         else:
-            subprocess.check_output(
-                shlex.split(
-                    '{} create {}'.format(heroku_executable_path, heroku_app_name)
+            heroku_app_name = (
+                  '{}-{}-{}'.format(
+                      user_name,
+                      task_name,
+                      hashlib.md5(heroku_user_identifier.encode('utf-8')).hexdigest(),
+                  )
+              )[:30]
+
+            while heroku_app_name[-1] == '-':
+                heroku_app_name = heroku_app_name[:-1]
+
+            if heroku_team is not None:
+                subprocess.check_output(
+                    shlex.split(
+                        '{} create {} --team {}'.format(
+                            heroku_executable_path, heroku_app_name, heroku_team
+                        )
+                    )
                 )
-            )
+            else:
+                subprocess.check_output(
+                    shlex.split(
+                        '{} create {}'.format(heroku_executable_path, heroku_app_name)
+                    )
+                )
     except subprocess.CalledProcessError:  # User has too many apps
         sh.rm(shlex.split('-rf {}'.format(heroku_server_directory_path)))
         raise SystemExit(
@@ -492,6 +523,7 @@ def delete_heroku_server(task_name, tmp_dir=parent_dir):
             hashlib.md5(heroku_user_identifier.encode('utf-8')).hexdigest(),
         )
     )[:30]
+
     while heroku_app_name[-1] == '-':
         heroku_app_name = heroku_app_name[:-1]
     print("Heroku: Deleting server: {}".format(heroku_app_name))
@@ -578,6 +610,8 @@ def setup_legacy_server(
     use_hobby=False,
     legacy=True,
     tmp_dir=parent_dir,
+    existing_app=False,
+    heroku_app_name=None
 ):
     if local:
         return setup_local_server(task_name, task_files_to_copy=task_files_to_copy)
@@ -587,6 +621,8 @@ def setup_legacy_server(
         heroku_team=heroku_team,
         use_hobby=use_hobby,
         tmp_dir=tmp_dir,
+        existing_app=existing_app,
+        heroku_app_name=heroku_app_name
     )
 
 
@@ -598,6 +634,8 @@ def setup_server(
     use_hobby=False,
     legacy=True,
     tmp_dir=parent_dir,
+    existing_app=False,
+    heroku_app_name=None
 ):
     if local:
         raise Exception('Local server not yet supported for non-legacy tasks')
@@ -607,6 +645,8 @@ def setup_server(
         heroku_team=heroku_team,
         use_hobby=use_hobby,
         tmp_dir=tmp_dir,
+        existing_app=existing_app,
+        heroku_app_name=heroku_app_name
     )
 
 
