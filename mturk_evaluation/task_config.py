@@ -10,14 +10,14 @@ task_config = {}
 On the Amazon Mechanical Turk web site, the HIT title appears in search results,
 and everywhere the HIT is mentioned.
 """
-task_config['hit_title'] = 'Give a rating to a dialog between two people'
+task_config['hit_title'] = 'MMI-bidi Model Evaluation'
 
 
 """A description includes detailed information about the kind of task the HIT contains.
 On the Amazon Mechanical Turk web site, the HIT description appears in the expanded
 view of search results, and in the HIT and assignment screens.
 """
-task_config['hit_description'] = 'Give a rating to a dialog between two people.'
+task_config['hit_description'] = 'Give a rating to a dialog between a bot and a prompt.'
 
 
 """One or more words or phrases that describe the HIT, separated by commas.
@@ -29,10 +29,8 @@ task_config['hit_keywords'] = 'chat,dialog,rating'
 """A detailed task description that will be shown on the HIT task preview page
 and on the left side of the chat page. Supports HTML formatting.
 """
-task_config[
-    'task_description'
-] = '''\'\'\'
-In this task, you are going to read a dialog between two people, and you will need to give a rating on how good the response is.<br><br>
+task_config['task_description'] = '''
+In this task, you are going to read a dialog between a bot and a model, and you will need to give a rating on how good the response is.<br><br>
 Example:<br><br>
 ------------------- Task Begin ------------------- <br><br>
 <b>Model Evaluator</b>:<br>
@@ -43,4 +41,4 @@ True its an opinion as is my comment . I 'd say quantum of solace was meh , blan
 8<br><br>
 ------------------- Task Done ------------------- <br><br>
 If you are ready, please click "Accept HIT" to start this task.
-\'\'\''''
+'''

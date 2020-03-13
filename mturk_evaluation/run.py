@@ -45,7 +45,7 @@ def main():
         'tensorboard_log': False,
     }
 
-    print(f"CURRENT OPTIONS {opt}")
+    # print(f"CURRENT OPTIONS {opt}")
 
     # Set up the model we want to evaluate
     tester_agent = create_agent(opt)
@@ -54,12 +54,12 @@ def main():
     task_opt = {}
     task_opt['datatype'] = 'test'
     task_opt['datapath'] = opt['datapath']
-    # task_opt['task'] = '#DailyDialog'
-    task_opt['task'] = '#Persona-Chat'
+    task_opt['task'] = '#DailyDialog'
+    # task_opt['task'] = '#Persona-Chat'
 
     mturk_agent_id = 'Worker'
     mturk_manager = MTurkManager(opt=opt, mturk_agent_ids=[mturk_agent_id])
-    mturk_manager.setup_server()
+    mturk_manager.setup_server(heroku_app_name="dialogue-hw4-mturk-eval", existing_app=True)
 
     try:
         mturk_manager.start_new_run()
