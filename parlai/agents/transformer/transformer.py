@@ -498,8 +498,8 @@ class TransformerGeneratorMMIAgent(TorchGeneratorAgent):
             - beams :list of Beam instances defined in Beam class, can be used for any
               following postprocessing, e.g. dot logging.
         """
-        print("In TransformerGeneratorMMIAgent self._generate()")
-        print(f"\tInput to method:\n\t\tBatch:{batch}\n\t\tBeam size: {beam_size}\n\t\tMax ts:{max_ts}")
+        # print("In TransformerGeneratorMMIAgent self._generate()")
+        # print(f"\tInput to method:\n\t\tBatch:{batch}\n\t\tBeam size: {beam_size}\n\t\tMax ts:{max_ts}")
         model = self.model
         model_backwards = self.model_backwards
         self.max_output_length = max_ts

@@ -12,7 +12,8 @@ PROJECT_HOME=/home/aadelucia/files/course_projects/discourse-hw4/ParlAI
 
 python "$PROJECT_HOME/mturk_evaluation/run.py" \
   --sandbox \
-  -nc 3 \
+  -nc 1 \
+  --model transformer/generatorMMI \
   --model-file $PROJECT_HOME/parlai_internal/forward_finetune.ckpt \
   --model-file-backward $PROJECT_HOME/parlai_internal/backward.ckpt.checkpoint \
   --no-cuda \

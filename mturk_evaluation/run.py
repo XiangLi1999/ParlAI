@@ -92,7 +92,8 @@ def main():
                 mturk_agent=mturk_agent,
             )
 
-            while not world.episode_done():
+            for i in range(51):
+            # while not world.episode_done():
                 world.parley()
             world.shutdown()
             world.review_work()
