@@ -45,6 +45,12 @@ Run the Mechanical Turk evaluation with the following command:
 ```
 This script is setup to work on the CLSP grid. You may have to sign into your Heroku account (you can create one [here](https://heroku.com/)). More detailed instructions for all the needed accounts are available [here](https://parl.ai/docs/tutorial_mturk.html#running-a-task).
 
+To create our Mechanical Turk task we modified the `parlai/mturk/tasks/model_evaluator` task. We made the following changes:
+* changed the model task to `#DailyDialog`
+* loaded our own agent (GeneratorMMI model trained on filtered OpenSubtitles and finetuned on DailyDialog)
+* increased the session length so the Turker rates multiple responses in a session
+* altered the Heroku server start-up to push to a pre-created app
+
 ### Qualitative Evaluation
 TODO
 
